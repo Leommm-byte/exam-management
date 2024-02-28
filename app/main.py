@@ -79,7 +79,11 @@ def register():
         db.session.add(new_user)
         db.session.commit()
         login_user(new_user)
-        return jsonify({'message': 'New user created!'}), 201
+        return jsonify({
+            'message': 'New user created!',
+            'username': new_user.username,
+            'role': new_user.role,
+            }), 201
     
     return jsonify({'message': 'Please fill out the form'}), 400
 
@@ -94,7 +98,11 @@ def login():
         
         if user and bcrypt.check_password_hash(user.password, password):
             login_user(user)
-            return jsonify({'message': 'You are now logged in'}), 200
+            return jsonify({
+                'message': 'You are now logged in',
+                'username': user.username,
+                'role': user.role                            
+                            }), 200
         
         return jsonify({'message': 'Invalid username or password'}), 401
 
@@ -162,7 +170,7 @@ def timetable():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('home'))
+    return jsonify({'message': 'You are now logged out'}), 200
 
 
 if __name__ == '__main__':
