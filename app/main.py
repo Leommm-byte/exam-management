@@ -10,7 +10,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = {os.environ.get("SECRET_KEY")}
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///exam-management.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = f"postgresql://default:{os.environ.get('POSTGRES_PASSWORD')}@{os.environ.get('POSTGRES_HOST')}:5432/verceldb?sslmode=require"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -23,21 +23,21 @@ bcrypt = Bcrypt(app)
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), unique=True)
-    password = db.Column(db.String(20))
+    username = db.Column(db.String(150), unique=True)
+    password = db.Column(db.String(150))
     role = db.Column(db.String(20), default='student')
 
 
 class Exam(db.Model):
     __tablename__ = "exams"
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(20))
-    course = db.Column(db.String(20))
-    date = db.Column(db.String(20))
-    time = db.Column(db.String(20))
+    name = db.Column(db.String(150))
+    course = db.Column(db.String(150))
+    date = db.Column(db.String(30))
+    time = db.Column(db.String(30))
     period = db.Column(db.String(20))
     active = db.Column(db.Boolean, default=False)
-    department = db.Column(db.String(50))
+    department = db.Column(db.String(150))
     s_class = db.Column(db.String(50))
 
 
