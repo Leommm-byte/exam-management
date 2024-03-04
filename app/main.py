@@ -1,32 +1,32 @@
-from flask import Flask, request, redirect, url_for, jsonify
+from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
+from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 from dotenv import load_dotenv
+from datetime import timedelta
 import os
-
 
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = {os.environ.get("SECRET_KEY")}
+app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY")
 app.config['SQLALCHEMY_DATABASE_URI'] = f"postgresql://default:{os.environ.get('POSTGRES_PASSWORD')}@{os.environ.get('POSTGRES_HOST')}:5432/verceldb?sslmode=require"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = os.environ.get("JWT_SECRET_KEY")  # add this line
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
 db = SQLAlchemy(app)
 
-login_manager = LoginManager()
-login_manager.init_app(app)
-
 bcrypt = Bcrypt(app)
+jwt = JWTManager(app)  # add this line
 
 
-class User(UserMixin, db.Model):
+
+class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True)
     password = db.Column(db.String(150))
     role = db.Column(db.String(20), default='student')
-
 
 class Exam(db.Model):
     __tablename__ = "exams"
@@ -40,137 +40,108 @@ class Exam(db.Model):
     department = db.Column(db.String(150))
     s_class = db.Column(db.String(50))
 
-
 with app.app_context():
     db.create_all()
-    
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
 
 
-@app.route('/')
-def home():
-    return 'Welcome to the Flask Login Example!'
-
-
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['POST'])
 def register():
-    if request.method == 'POST':
-        username = request.json['username']
-        password = request.json['password']
-        role = request.json['role']
+    username = request.json.get('username', None)
+    password = request.json.get('password', None)
+    role = request.json.get('role', None)
 
-        # Check if username already exists
-        existing_user = User.query.filter_by(username=username).first()
-        if existing_user:
-            return jsonify({'message': 'That username already exists!'}), 400
+    existing_user = User.query.filter_by(username=username).first()
+    if existing_user:
+        return jsonify({'message': 'That username already exists!'}), 400
 
-        # Check if password meets requirements
-        if len(password) < 8:
-            return jsonify({'message': 'Password must be at least 8 characters long'}), 400
+    if len(password) < 8:
+        return jsonify({'message': 'Password must be at least 8 characters long'}), 400
 
-        # Hash the password
-        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
 
-        # Create a new user
-        new_user = User(username=username, password=hashed_password, role=role)
-        db.session.add(new_user)
-        db.session.commit()
-        login_user(new_user)
-        return jsonify({
-            'message': 'New user created!',
-            'username': new_user.username,
-            'role': new_user.role,
-            }), 201
-    
-    return jsonify({'message': 'Please fill out the form'}), 400
+    new_user = User(username=username, password=hashed_password, role=role)
+    db.session.add(new_user)
+    db.session.commit()
+
+    access_token = create_access_token(identity=username)  # create a new access token
+
+    return jsonify({
+        'message': 'New user created!',
+        'username': new_user.username,
+        'role': new_user.role,
+        'access_token': access_token  # return the access token
+    }), 201
 
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['POST'])
 def login():
-    if request.method == 'POST':
-        username = request.json['username']
-        password = request.json['password']
+    username = request.json.get('username', None)
+    password = request.json.get('password', None)
 
-        user = User.query.filter_by(username=username).first()
-        
-        if user and bcrypt.check_password_hash(user.password, password):
-            login_user(user)
-            return jsonify({
-                'message': 'You are now logged in',
-                'username': user.username,
-                'role': user.role                            
-                            }), 200
-        
-        return jsonify({'message': 'Invalid username or password'}), 401
+    user = User.query.filter_by(username=username).first()
 
-    return jsonify({'message': 'Please fill out the form'}), 400
+    if user and bcrypt.check_password_hash(user.password, password):
+        access_token = create_access_token(identity=username)
+        return jsonify(access_token=access_token), 200
+
+    return jsonify({'message': 'Invalid username or password'}), 401
+
+
+
+@app.route('/timetable', methods=['GET'])
+# @jwt_required
+def view_timetable():
+    exams = Exam.query.all()
+    timetable = []
+
+    for exam in exams:
+        exam_details = {
+            'name': exam.name,
+            'course': exam.course,
+            'date': exam.date,
+            'time': exam.time,
+            'period': exam.period,
+            'active': exam.active,
+            'department': exam.department,
+            'class': exam.s_class
+        }
+        timetable.append(exam_details)
+
+    return jsonify({'timetable': timetable}), 200
+
 
 
 @app.route('/set-exam', methods=['POST'])
-@login_required
+@jwt_required
 def set_exam():
-    try:
-        if current_user.role != 'staff':
-            return jsonify({'message': 'Access denied'}), 403
-        
-        exam_details = request.get_json()
-        name = exam_details['data']['name']
-        course = exam_details['data']['course']
-        date = exam_details['data']['date']
-        time = exam_details['data']['time']
-        period = exam_details['data']['period']
-        active = exam_details['data']['active']
-        department = exam_details['department']
-        s_class = exam_details['class']
-        
-        new_exam = Exam(name=name, course=course, date=date, time=time, 
-                        period=period, active=active, department=department, 
-                        s_class=s_class
-                        )
-        
-        db.session.add(new_exam)
-        db.session.commit()
-        
-        return jsonify({'message': 'Exam set!'}), 200
-    
-    except Exception as e:
-        return jsonify({'message': 'An error occurred', 'error': str(e)}), 500
-    
+    current_user = get_jwt_identity()
+    user = User.query.filter_by(username=current_user).first()
 
-@app.route('/timetable')
-@login_required
-def timetable():
-    try:
-        exams = Exam.query.all()
-        timetable = []
+    if user.role != 'staff':
+        return jsonify({'message': 'Access denied'}), 403
 
-        for exam in exams:
-            exam_details = {
-                'name': exam.name,
-                'course': exam.course,
-                'date': exam.date,
-                'time': exam.time,
-                'period': exam.period,
-                'active': exam.active,
-                'department': exam.department,
-                'class': exam.s_class
-            }
-            timetable.append(exam_details)
+    exam_details = request.get_json()
+    name = exam_details['data']['name']
+    course = exam_details['data']['course']
+    date = exam_details['data']['date']
+    time = exam_details['data']['time']
+    period = exam_details['data']['period']
+    active = exam_details['data']['active']
+    department = exam_details['department']
+    s_class = exam_details['class']
 
-        return jsonify({'timetable': timetable}), 200
+    new_exam = Exam(name=name, course=course, date=date, time=time, 
+                    period=period, active=active, department=department, 
+                    s_class=s_class
+                    )
 
-    except Exception as e:
-        return jsonify({'message': 'An error occurred', 'error': str(e)}), 500
+    db.session.add(new_exam)
+    db.session.commit()
+
+    return jsonify({'message': 'Exam set!'}), 200
 
 
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return jsonify({'message': 'You are now logged out'}), 200
+
 
 
 if __name__ == '__main__':
