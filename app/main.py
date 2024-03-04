@@ -112,7 +112,7 @@ def view_timetable():
 
 
 @app.route('/set-exam', methods=['POST'])
-@jwt_required
+@jwt_required()
 def set_exam():
     current_user = get_jwt_identity()
     user = User.query.filter_by(username=current_user).first()
