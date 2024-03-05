@@ -5,6 +5,7 @@ from flask_jwt_extended import JWTManager, jwt_required, create_access_token, ge
 from dotenv import load_dotenv
 from datetime import timedelta
 import os
+from flask_cors import CORS
 
 load_dotenv()
 
@@ -18,6 +19,8 @@ db = SQLAlchemy(app)
 
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)  # add this line
+
+CORS(app, supports_credentials=True, origins=["https://exam-mgt-sodiq-js.vercel.app/", "http://localhost:5173", "http://127.0.0.1:5173"])
 
 
 
