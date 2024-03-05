@@ -20,7 +20,7 @@ db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)  # add this line
 
-CORS(app, supports_credentials=True, origins=["https://exam-mgt-sodiq-js.vercel.app/", "http://localhost:5173", "http://127.0.0.1:5173"])
+# CORS(app, supports_credentials=True, origins=["https://exam-mgt-sodiq-js.vercel.app/", "http://localhost:5173", "http://127.0.0.1:5173"])
 
 
 
