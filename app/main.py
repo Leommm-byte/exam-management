@@ -10,7 +10,7 @@ from flask_cors import CORS
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["https://exam-mgt-sodiq-js.vercel.app", "http://localhost:5173", "http://127.0.0.1:5173"])
+CORS(app, supports_credentials=True, origins=["https://exam-mgt-sodiq-js.vercel.app", "http://localhost:5173", "http://127.0.0.1:5173", "https://exam-mgt-std.vercel.app", "https://exam-mgt-sodiq-inv.vercel.app"])
 app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY")
 app.config['SQLALCHEMY_DATABASE_URI'] = f"postgresql://default:{os.environ.get('POSTGRES_PASSWORD')}@{os.environ.get('POSTGRES_HOST')}:5432/verceldb?sslmode=require"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
